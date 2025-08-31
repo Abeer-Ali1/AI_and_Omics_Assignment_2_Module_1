@@ -1,0 +1,135 @@
+# ===================================================================
+#       AI and Biotechnology / Bioinformatics
+#       AI and Omics Research Internship (2025)
+#       Module I: Assignment 2 - Differential Gene Expression Analysis
+# ===================================================================
+
+# ---------------------------
+# 1. Define classify_gene() function
+# ---------------------------
+classify_gene <- function(logFC, padj) {
+  if (is.na(padj)) padj <- 1
+  if (logFC > 1 && padj < 0.05) {
+    return("Upregulated")
+  } else if (logFC < -1 && padj < 0.05) {
+    return("Downregulated")
+  } else {
+    return("Not_Significant")
+  }
+}
+
+# ---------------------------
+# 2. Set up directories and file list
+# ---------------------------
+input_dir <- "Raw_Data"
+output_dir <- "Results"
+files_to_process <- c("DEGs_Data_1.csv", "DEGs_Data_2.csv")
+
+# Create Results folder
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+}
+
+# ---------------------------
+# 3. Loop through each file
+# ---------------------------
+for (file_name in files_to_process) {
+  cat("\nProcessing:", file_name, "\n")
+  
+  input_path <- file.path(input_dir, file_name)
+  
+  if (!file.exists(input_path)) {
+    cat("ERROR: File not found at:", input_path, "\n")
+    next
+  }
+  
+  data <- read.csv(input_path, header = TRUE)
+  cat("File imported. Dimensions:", dim(data), "\n")
+  
+  required_cols <- c("Gene_Id", "padj", "logFC")
+  if (!all(required_cols %in% names(data))) {
+    cat("Error: Missing required columns. Found:", paste(names(data), collapse = ", "), "\n")
+    next
+  }
+  
+  na_count <- sum(is.na(data$padj))
+  data$padj[is.na(data$padj)] <- 1
+  cat("Replaced", na_count, "NA values in 'padj' with 1.\n")
+  
+  data$status <- mapply(classify_gene, data$logFC, data$padj)
+  
+  output_path <- file.path(output_dir, paste0("Processed_", file_name))
+  write.csv(data, output_path, row.names = FALSE)
+  cat("Saved to:", output_path, "\n")
+  
+  cat("Summary:\n")
+  print(table(data$status))
+}
+# ===================================================
+# 4. FINAL SUMMARY: Aggregate Results Across Both Files
+# ===================================================
+
+cat("\n", "=", sep = "")
+cat("\n✅ FINAL SUMMARY OF DIFFERENTIAL GENE EXPRESSION\n")
+cat("=", "\n", sep = "")
+
+# Prepare a results table
+summary_table <- data.frame(
+  Dataset = character(),
+  Upregulated = numeric(),
+  Downregulated = numeric(),
+  Not_Significant = numeric(),
+  Total_Significant = numeric(),
+  stringsAsFactors = FALSE
+)
+
+for (file_name in files_to_process) {
+  input_path <- file.path(input_dir, file_name)
+  
+  if (!file.exists(input_path)) {
+    cat("⚠️  Could not summarize", file_name, ": File not found!\n")
+    next
+  }
+  
+  data <- read.csv(input_path, header = TRUE)
+  
+  # Handle NA in padj
+  data$padj[is.na(data$padj)] <- 1
+  
+  # Classify genes
+  data$status <- mapply(classify_gene, data$logFC, data$padj)
+  
+  # Get counts safely
+  status_counts <- table(data$status)
+  
+  up   <- if ("Upregulated"   %in% names(status_counts)) as.numeric(status_counts["Upregulated"])   else 0
+  down <- if ("Downregulated" %in% names(status_counts)) as.numeric(status_counts["Downregulated"]) else 0
+  not_sig <- if ("Not_Significant" %in% names(status_counts)) as.numeric(status_counts["Not_Significant"]) else 0
+  
+  # Add row to summary
+  summary_table <- rbind(summary_table, data.frame(
+    Dataset = gsub(".csv", "", file_name),  # e.g., "DEGs_Data_1"
+    Upregulated = up,
+    Downregulated = down,
+    Not_Significant = not_sig,
+    Total_Significant = up + down
+  ))
+}
+
+# Print final summary
+cat("Summary of gene classification:\n")
+print(summary_table, row.names = FALSE)
+
+# Save to Results folder
+summary_output <- file.path(output_dir, "Summary_Results.csv")
+write.csv(summary_table, summary_output, row.names = FALSE)
+cat("\n📁 Summary saved to:", summary_output, "\n")
+
+# pkgdown site
+docs/
+
+# translation temp files
+po/*~
+
+# RStudio Connect folder
+rsconnect/
